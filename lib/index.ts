@@ -1,10 +1,13 @@
 import { globToRegex } from "./glob";
 import { execSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { relative } from "node:path/posix";
 
 type Instruction = [glob: string, ...commands: string[]];
 
-export const lintTime = async (): Promise<string> => {
+const MAX_ARG_LENGTH = 120_000;
+
+export const lintTime = async (): Promise<boolean> => {
   const json = JSON.parse(await readFile("package.json", "utf8"));
 
   let instructions: Instruction[];
@@ -16,6 +19,7 @@ export const lintTime = async (): Promise<string> => {
       if (instruction.length < 2) {
         throw new Error(`${JSON.stringify(instruction)} is not a valid instruction`);
       }
+      instruction.push("git add");
     }
     instructions = json["lint-time"];
   } else {
@@ -29,14 +33,64 @@ export const lintTime = async (): Promise<string> => {
     .filter(Boolean)
     .map((filePath) => process.cwd() + "/" + filePath);
 
-  // get all files
-  instructionsToDirections(instructions, stagedFilePaths);
+  const pipelines = instructionsToPipelines(instructions, stagedFilePaths);
 
-  return ":)";
+  let shouldStop = false;
+  try {
+    await Promise.all(
+      pipelines.map(async ([commands, entries]) => {
+        for (const [i, command] of commands.entries()) {
+          if (shouldStop) return;
+
+          const filePaths = entries
+            .filter(([, steps]) => steps.has(i))
+            .map(([filePath]) => shellEscape(relative(process.cwd(), filePath)));
+
+          const chunks: string[][] = [[]];
+          let leftInChunk = MAX_ARG_LENGTH - command.length;
+          let activeChunk = chunks[0];
+
+          for (const filePath of filePaths) {
+            if (leftInChunk > filePath.length || activeChunk.length === 0) {
+              activeChunk.push(filePath);
+            } else {
+              activeChunk = [filePath];
+              chunks.push(activeChunk);
+              leftInChunk = MAX_ARG_LENGTH - command.length;
+            }
+          }
+
+          for (const chunk of chunks) {
+            try {
+              execSync(`${command} ${chunk.join(" ")}`, { stdio: "inherit" });
+            } catch (error) {
+              const error_ =
+                error && typeof error === "object" && "status" in error && error.status
+                  ? error.status
+                  : error;
+              throw error_;
+            }
+          }
+        }
+      })
+    );
+  } catch (error) {
+    shouldStop = true;
+    if (error instanceof Error) {
+      throw error;
+    }
+    return false;
+  }
+  return true;
 };
 
-export const instructionsToDirections = (instructions: Instruction[], filePaths: string[]) => {
-  for (let [glob] of instructions) {
+type Pipeline = [commands: string[], entries: [filePath: string, steps: Set<number>][]];
+
+const instructionsToPipelines = (instructions: Instruction[], filePaths: string[]): Pipeline[] => {
+  const fileCommandsMap = new Map<string, string[]>();
+
+  for (const [glob_, ...commands] of instructions) {
+    let glob = glob_;
     if (glob.startsWith("/")) {
       glob = glob.slice(1);
     } else if (!glob.startsWith("**/")) {
@@ -44,103 +98,59 @@ export const instructionsToDirections = (instructions: Instruction[], filePaths:
     }
 
     const regex = globToRegex(glob);
-    // eslint-disable-next-line no-console
-    console.log(regex, filePaths);
-    const matchingFilePaths = filePaths.filter((filePath) => regex.test(filePath));
-    // eslint-disable-next-line no-console
-    console.log(matchingFilePaths);
+    for (const filePath of filePaths) {
+      if (regex.test(filePath)) {
+        const maybeFileCommands = fileCommandsMap.get(filePath);
+        let fileCommands: string[];
+        if (maybeFileCommands) {
+          fileCommands = maybeFileCommands;
+        } else {
+          fileCommands = [];
+          fileCommandsMap.set(filePath, fileCommands);
+        }
+        fileCommands.push(...commands);
+      }
+    }
   }
+
+  const sortedFileInstructionSets = [...fileCommandsMap.entries()].sort(
+    ([, a], [, b]) => b.length - a.length
+  );
+
+  const pipelines: [commands: string[], entries: [filePath: string, steps: Set<number>][]][] = [];
+  file: for (const [filePath, commands] of sortedFileInstructionSets) {
+    for (const pipeline of pipelines) {
+      const steps = new Set<number>();
+      let j = 0;
+      for (let i = 0; i < pipeline[0].length; i++) {
+        if (commands[j] === pipeline[0][i]) {
+          steps.add(j);
+          j += 1;
+          if (j === commands.length) break;
+        }
+      }
+      const couldFileUsePipeline = j === commands.length;
+      if (couldFileUsePipeline) {
+        pipeline[1].push([filePath, steps]);
+        continue file;
+      }
+    }
+    pipelines.push([commands, [[filePath, new Set(commands.map((_, i) => i))]]]);
+  }
+
+  return pipelines;
 };
 
+const REQUIRES_ESCAPE_REGEX = /[^\w/:=-]/;
+const QUOTE_REGEX = /'/g;
+const LEADING_QUOTES_REGEX = /^(?:'')+/g;
+const BACKSLASH_QUOTES_REGEX = /\\'''/g;
+
+const shellEscape = (arg: string): string =>
+  REQUIRES_ESCAPE_REGEX.test(arg)
+    ? `'${arg.replace(QUOTE_REGEX, "'\\''")}'`
+        .replace(LEADING_QUOTES_REGEX, "")
+        .replace(BACKSLASH_QUOTES_REGEX, "\\'")
+    : arg;
+
 lintTime();
-
-// ✔ Preparing lint-staged...
-// ❯ Running tasks for staged files...
-//   ❯ packages/frontend/.lintstagedrc.json — 1 file
-//     ↓ *.js — no files [SKIPPED]
-//     ❯ *.{json,md} — 1 file
-//       ⠹ prettier --write
-//   ↓ packages/backend/.lintstagedrc.json — 2 files
-//     ❯ *.js — 2 files
-//       ⠼ eslint --fix
-//     ↓ *.{json,md} — no files [SKIPPED]
-// ◼ Applying modifications from tasks...
-// ◼ Cleaning up temporary files...
-//
-// "glob": ["npx a", "npx b"]
-//
-// "lint-time": [
-//   ["**/*.ts",
-//     "eslint -c .eslintrc.cjs --cache --fix --max-warnings=0",
-//     "prettier --ignore-path .gitignore --write"
-//   ],
-//   ["**/*.{js,cjs,mjs,json}",
-//     "prettier --ignore-path .gitignore --write"
-//   ]
-// }
-
-// * order matters for ones that match multiple
-// * concurrent where possible...
-//   * but prioritise doing something once with a+b files versus parallel once with a + once with b
-
-// const lintStaged = async (
-//   {
-//     allowEmpty = false,
-//     concurrent = true,
-//     config: configObject,
-//     configPath,
-//     cwd,
-//     debug = false,
-//     diff,
-//     diffFilter,
-//     maxArgLength = getMaxArgLength() / 2,
-//     stash = true,
-//     verbose = false,
-//   } = {},
-//   logger = console
-// ) => {
-//   await validateOptions({ cwd, shell }, logger)
-//   // Unset GIT_LITERAL_PATHSPECS to not mess with path interpretation
-//   debugLog('Unset GIT_LITERAL_PATHSPECS (was `%s`)', process.env.GIT_LITERAL_PATHSPECS)
-//   delete process.env.GIT_LITERAL_PATHSPECS
-//   const options = {
-//     allowEmpty,
-//     concurrent,
-//     configObject,
-//     configPath,
-//     cwd,
-//     debug,
-//     diff,
-//     diffFilter,
-//     maxArgLength,
-//     quiet,
-//     relative,
-//     shell,
-//     stash,
-//     verbose,
-//   }
-//   try {
-//     debugLog('Tasks were executed successfully!')
-//     printTaskOutput(ctx, logger)
-//     return true
-//   } catch (runAllError) {
-//     if (runAllError?.ctx?.errors) {
-//       const { ctx } = runAllError
-//       if (ctx.errors.has(ConfigNotFoundError)) {
-//         logger.error(NO_CONFIGURATION)
-//       } else if (ctx.errors.has(ApplyEmptyCommitError)) {
-//         logger.warn(PREVENTED_EMPTY_COMMIT)
-//       } else if (ctx.errors.has(GitError) && !ctx.errors.has(GetBackupStashError)) {
-//         logger.error(GIT_ERROR)
-//         if (ctx.shouldBackup) {
-//           // No sense to show this if the backup stash itself is missing.
-//           logger.error(RESTORE_STASH_EXAMPLE)
-//         }
-//       }
-//       printTaskOutput(ctx, logger)
-//       return false
-//     }
-//     // Probably a compilation error in the config js file. Pass it up to the outer error handler for logging.
-//     throw runAllError
-//   }
-// }

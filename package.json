@@ -71,11 +71,11 @@
   },
   "lint-time": [
     [
-      "*.ts",
+      "*.test.ts",
       "npx eslint -c .eslintrc.cjs --cache --fix --max-warnings=0"
     ],
     [
-      "*.{ts,js,cjs,mjs,json}",
+      "*.ts",
       "npx prettier --ignore-path .gitignore --write"
     ]
   ],

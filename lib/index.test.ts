@@ -1,5 +1,5 @@
-import { hello } from ".";
+import { lintTime } from ".";
 
-test("hello says hello", () => {
-  expect(hello("world")).toBe(`Hello world!`);
+test("lintTime", async () => {
+  expect(await lintTime()).toBe(`Hello world!`);
 });
