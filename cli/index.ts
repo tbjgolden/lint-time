@@ -9,6 +9,7 @@ lintTime()
       console.log("lint-time success");
     } else {
       console.log("lint-time failed");
+      process.exit(1);
     }
   })
   .catch((error) => {
