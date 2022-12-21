@@ -50,6 +50,16 @@
   "files": [
     "dist"
   ],
+  "keywords": [
+    "lint",
+    "staged",
+    "files",
+    "git",
+    "precommit",
+    "hooks",
+    "parallel",
+    "time"
+  ],
   "simple-git-hooks": {
     "commit-msg": "npx --no -- commitlint --edit \"\"",
     "pre-commit": "npx xnr cli/index.ts",
