@@ -19,7 +19,6 @@ export const lintTime = async (): Promise<boolean> => {
       if (instruction.length < 2) {
         throw new Error(`${JSON.stringify(instruction)} is not a valid instruction`);
       }
-      instruction.push("git add");
     }
     instructions = json["lint-time"];
   } else {
@@ -35,13 +34,10 @@ export const lintTime = async (): Promise<boolean> => {
 
   const pipelines = instructionsToPipelines(instructions, stagedFilePaths);
 
-  let shouldStop = false;
   try {
     await Promise.all(
       pipelines.map(async ([commands, entries]) => {
         for (const [i, command] of commands.entries()) {
-          if (shouldStop) return;
-
           const filePaths = entries
             .filter(([, steps]) => steps.has(i))
             .map(([filePath]) => shellEscape(relative(process.cwd(), filePath)));
@@ -75,7 +71,6 @@ export const lintTime = async (): Promise<boolean> => {
       })
     );
   } catch (error) {
-    shouldStop = true;
     if (error instanceof Error) {
       throw error;
     }
@@ -138,6 +133,14 @@ const instructionsToPipelines = (instructions: Instruction[], filePaths: string[
     pipelines.push([commands, [[filePath, new Set(commands.map((_, i) => i))]]]);
   }
 
+  for (const pipeline of pipelines) {
+    const gitAddIndex = pipeline[0].length;
+    pipeline[0].push("git add");
+    for (const fileData of pipeline[1]) {
+      fileData[1].add(gitAddIndex);
+    }
+  }
+
   return pipelines;
 };
 
@@ -152,5 +155,3 @@ const shellEscape = (arg: string): string =>
         .replace(LEADING_QUOTES_REGEX, "")
         .replace(BACKSLASH_QUOTES_REGEX, "\\'")
     : arg;
-
-lintTime();

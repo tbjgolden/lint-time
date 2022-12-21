@@ -53,7 +53,7 @@
   ],
   "simple-git-hooks": {
     "commit-msg": "npx --no -- commitlint --edit \"\"",
-    "pre-commit": "npx lint-staged",
+    "pre-commit": "npx lint-time",
     "pre-push": "npx jest -o --coverage=false --passWithNoTests"
   },
   "prettier": {
@@ -71,12 +71,12 @@
   },
   "lint-time": [
     [
-      "*.test.ts",
-      "npx eslint -c .eslintrc.cjs --cache --fix --max-warnings=0"
+      "*.ts",
+      "eslint -c .eslintrc.cjs --cache --fix --max-warnings=0"
     ],
     [
-      "*.ts",
-      "npx prettier --ignore-path .gitignore --write"
+      "*.{ts,js,cjs,mjs,json}",
+      "prettier --ignore-path .gitignore --write"
     ]
   ],
   "jest": {
