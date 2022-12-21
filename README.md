@@ -13,12 +13,12 @@ commit.
 
 It aims to achieve **_the same goal with a far smaller footprint_**.
 
-When used with [`simple-git-hooks`](https://github.com/toplenboren/simple-git-hooks), it can lint
-your commits and block bad commits.
+When used with [`simple-git-hooks`](https://github.com/toplenboren/simple-git-hooks) or
+[`husky`](https://github.com/typicode/husky), it can lint your commits and block bad commits.
 
 ## Background
 
-**Why not just use `husky` + `lint-staged` instead?**
+**Why not just use `lint-staged` instead?**
 
 |                                      `lint-time` |                                      `lint-staged` |
 | -----------------------------------------------: | -------------------------------------------------: |
