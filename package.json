@@ -1,6 +1,7 @@
 {
   "name": "lint-time",
   "version": "0.1.0",
+  "description": "Lint your staged git files 🩺 (simpler lint-staged)",
   "license": "Apache-2.0",
   "main": "dist/cjs/index.cjs",
   "module": "dist/esm/index.mjs",
