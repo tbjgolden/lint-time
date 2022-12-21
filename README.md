@@ -36,32 +36,32 @@ npm install lint-time
 ## Usage
 
 ```sh
-npx lint-time ...
+npx lint-time
 ```
-
-Supports JavaScript + TypeScript:
-
-```ts
-import { foo } from "lint-time";
-
-foo();
-```
-
-Can also be imported via `require("lint-time")`.
 
 ## API
 
-...
+Exports a single function:
 
-## Credits
+```ts
+export declare const lintTime: () => Promise<boolean>;
+```
 
-...
+```ts
+import { lintTime } from "lint-time";
+
+lintTime().then((wasSuccessful) => {
+  console.log({ wasSuccessful });
+});
+```
+
+Supports JavaScript + TypeScript.
+
+Can also be imported via `require("lint-time")`.
 
 ## Contributing
 
-- State where users can ask questions.
-- State whether PRs are accepted.
-- List any requirements for contributing; for instance, having a sign-off on commits.
+GitHub issues / PRs welcome.
 
 Dev environment requires:
 
