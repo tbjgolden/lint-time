@@ -47,6 +47,9 @@ Exports a single function:
 export declare const lintTime: () => Promise<boolean>;
 ```
 
+`lintTime()` will not throw if the checks fail, but will throw if there's something unexpected with
+your system (e.g. a malformed `package.json`).
+
 ```ts
 import { lintTime } from "lint-time";
 
