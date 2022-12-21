@@ -1,6 +1,7 @@
 {
   "name": "lint-time",
   "version": "0.1.0",
+  "description": "Lint your staged git files 🩺",
   "license": "Apache-2.0",
   "main": "dist/cjs/index.cjs",
   "module": "dist/esm/index.mjs",
@@ -68,6 +69,16 @@
       "prettier --ignore-path .gitignore --write"
     ]
   },
+  "lint-time": [
+    [
+      "*.ts",
+      "npx eslint -c .eslintrc.cjs --cache --fix --max-warnings=0"
+    ],
+    [
+      "*.{ts,js,cjs,mjs,json}",
+      "npx prettier --ignore-path .gitignore --write"
+    ]
+  ],
   "jest": {
     "clearMocks": true,
     "coverageReporters": [
