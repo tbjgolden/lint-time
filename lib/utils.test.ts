@@ -1,4 +1,12 @@
-import { ensureEndsWithSlash, escapeStringForRegex, globToRegex } from "./glob";
+import {
+  ensureEndsWithSlash,
+  escapeStringForRegex,
+  globToRegex,
+  Instruction,
+  instructionsToPipelines,
+} from "./utils";
+
+const abs = (path: string) => `${process.cwd()}/${path}`;
 
 test("globToRegex", () => {
   expect(globToRegex(`./**/*.{ts,tsx}`).test(process.cwd() + "/wow/test.tsx")).toBe(true);
@@ -30,4 +38,56 @@ test("ensureEndsWithSlash", () => {
   expect(ensureEndsWithSlash("/hello/world/")).toBe("/hello/world/");
   expect(ensureEndsWithSlash("/hello")).toBe("/hello/");
   expect(ensureEndsWithSlash("/")).toBe("/");
+});
+
+test("instructionsToPipelines", () => {
+  const instructions: Instruction[] = [
+    ["*.ts", "npx eslint -c .eslintrc.cjs --cache --fix --max-warnings=0"],
+    ["*.{ts,js,cjs,mjs,json}", "npx prettier --ignore-path .gitignore --write"],
+  ];
+  const filePaths = [
+    ".editorconfig",
+    ".eslintrc.cjs",
+    ".gitignore",
+    ".scripts/build.ts",
+    ".scripts/checkBuild.ts",
+    ".scripts/lib/utils.ts",
+    ".vscode/extensions.json",
+    ".vscode/settings.json",
+    "LICENSE",
+    "README.md",
+    "banner.svg",
+    "cli/index.ts",
+    "lib/exclamation.ts",
+    "lib/index.test.ts",
+    "lib/index.ts",
+    "package-lock.json",
+    "package.json",
+    "tsconfig.json",
+    // eslint-disable-next-line unicorn/no-array-callback-reference
+  ].map(abs);
+  expect(instructionsToPipelines(instructions, filePaths)).toEqual([
+    [
+      [
+        "npx eslint -c .eslintrc.cjs --cache --fix --max-warnings=0",
+        "npx prettier --ignore-path .gitignore --write",
+        "git add",
+      ],
+      [
+        [abs(".scripts/build.ts"), new Set([0, 1, 2])],
+        [abs(".scripts/checkBuild.ts"), new Set([0, 1, 2])],
+        [abs(".scripts/lib/utils.ts"), new Set([0, 1, 2])],
+        [abs("cli/index.ts"), new Set([0, 1, 2])],
+        [abs("lib/exclamation.ts"), new Set([0, 1, 2])],
+        [abs("lib/index.test.ts"), new Set([0, 1, 2])],
+        [abs("lib/index.ts"), new Set([0, 1, 2])],
+        [abs(".eslintrc.cjs"), new Set([1, 2])],
+        [abs(".vscode/extensions.json"), new Set([1, 2])],
+        [abs(".vscode/settings.json"), new Set([1, 2])],
+        [abs("package-lock.json"), new Set([1, 2])],
+        [abs("package.json"), new Set([1, 2])],
+        [abs("tsconfig.json"), new Set([1, 2])],
+      ],
+    ],
+  ]);
 });
